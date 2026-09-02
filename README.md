@@ -25,6 +25,31 @@ By the end of this lab I want to be comfortable with:
 
 Later I also want to use the environment for security-focused AD exercises.
 
+## What will be in this repo
+
+This repo will gradually build into a full record of the lab, not just the final working setup.
+
+I’m planning to document:
+
+- the overall lab design and why I chose this setup
+- VirtualBox networking and the `ADLAB-NAT` configuration
+- Windows Server 2022 installation and baseline setup
+- Active Directory Domain Services installation
+- creation of the `adlab.test` forest
+- DNS configuration and how AD uses DNS
+- Organizational Unit design
+- users, groups and computer objects
+- Windows client deployment and domain joining
+- Group Policy configuration
+- Windows DHCP
+- file shares and NTFS permissions
+- common IT support scenarios like password resets, lockouts and login issues
+- troubleshooting notes from anything that breaks along the way
+- PowerShell used for verification and AD administration
+- network and AD structure diagrams
+- selected screenshots that actually prove something useful
+- later security-focused AD exercises once the admin side is properly understood
+
 ## Lab Environment
 
 ### Host
@@ -180,6 +205,7 @@ adlab.test
 ```
 
 This will be an isolated lab domain used only inside the virtual environment.
+
 
 ## Why I’m Documenting This
 
