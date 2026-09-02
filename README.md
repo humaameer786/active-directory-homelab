@@ -35,7 +35,7 @@ I’m planning to document:
 - VirtualBox networking and the `ADLAB-NAT` configuration
 - Windows Server 2022 installation and baseline setup
 - Active Directory Domain Services installation
-- creation of the `adlab.test` forest
+- creation of the `hoomaverse.test` forest
 - DNS configuration and how AD uses DNS
 - Organizational Unit design
 - users, groups and computer objects
