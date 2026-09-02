@@ -1,8 +1,6 @@
 # Active Directory HomeLab 👩‍💻
 
-I’m building this lab to properly learn Active Directory by actually setting up a small Windows domain environment from scratch, rather than just reading about AD or following a finished setup.
-
-The aim is to understand what is happening underneath each step, especially networking, DNS, authentication, users and groups, Group Policy, domain joins, and the kind of troubleshooting I would actually need to do in an IT support or security role.
+I’m building this lab to properly learn Active Directory by actually setting up a small Windows domain environment from scratch. The aim is to understand what is happening underneath each step, especially networking, DNS, authentication, users and groups, Group Policy, domain joins, and the kind of troubleshooting I would actually need to do in an IT support or security role.
 
 This repo is a work in progress and I’ll keep updating it as I build the lab.
 
