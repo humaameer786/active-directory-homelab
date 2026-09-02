@@ -48,6 +48,8 @@ I’m planning to document:
 - selected screenshots that actually prove something useful
 - later security-focused AD exercises once the admin side is properly understood
 
+# Setup
+
 ## Lab Environment
 
 ### Host
@@ -205,7 +207,7 @@ adlab.test
 This will be an isolated lab domain used only inside the virtual environment.
 
 
-## Why I’m Documenting This
+# Why I’m Documenting This
 
 I don’t want this repo to just be a list of screenshots showing that I clicked through some Windows menus.
 
