@@ -298,7 +298,7 @@ Because this is the first Domain Controller, the promotion created both the new 
 
 I also configured a separate **Directory Services Restore Mode (DSRM)** password.
 
-> DSRM is used for offline Active Directory recovery if the directory services ever need to be repaired. The password itself is obviously not stored anywhere in this repo.
+> DSRM is used for offline Active Directory recovery if the directory services ever need to be repaired. 
 
 Windows displayed a DNS delegation warning during promotion because there is no existing parent DNS zone for `hoomaverse.test`. That was expected here because this is a brand-new isolated forest rather than a child domain underneath existing DNS infrastructure.
 
