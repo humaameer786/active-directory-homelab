@@ -45,7 +45,8 @@ I’m documenting:
 - troubleshooting notes from things that actually break
 - PowerShell and Windows commands used for verification
 - selected screenshots where they actually add something useful
-- later Windows DHCP, file shares, permissions and IT support scenarios
+- Windows DHCP
+- later file shares, permissions and IT support scenarios
 - later security-focused AD exercises once the admin side is properly understood
 
 ---
@@ -82,7 +83,7 @@ This section covers the foundation of the lab: the host machine, VM resources, V
 - 60 GB dynamically allocated VDI
 - connected to `ADLAB-NAT`
 - hostname: `CLIENT01`
-- IPv4: `10.10.10.20`
+- IPv4: `10.10.10.100` through a Windows DHCP reservation
 - DNS: `10.10.10.10`
 
 I used Windows 10 Pro because I wanted a lightweight client that still supports a normal Active Directory domain join.
@@ -103,7 +104,7 @@ I created a separate VirtualBox NAT Network for the AD lab instead of bridging t
              10.10.10.0/24
              /           \
         HOOMA-DC         CLIENT01
-       10.10.10.10      10.10.10.20
+       10.10.10.10      10.10.10.100
 ```
 
 Current network design:
@@ -113,8 +114,8 @@ Network:          10.10.10.0/24
 Subnet mask:      255.255.255.0
 Gateway:          10.10.10.1
 
-HOOMA-DC:         10.10.10.10
-CLIENT01:         10.10.10.20
+HOOMA-DC:         10.10.10.10 (static)
+CLIENT01:         10.10.10.100 (DHCP reservation)
 ```
 
 Both VMs are live on the same private lab network and can communicate with each other.
@@ -123,15 +124,21 @@ Both VMs are live on the same private lab network and can communicate with each 
 
 I intentionally disabled the DHCP server built into the VirtualBox NAT Network.
 
-I could have left it enabled and let VirtualBox automatically hand out IP configuration, but that would hide part of what I actually want to learn.
+I could have left it enabled and let VirtualBox automatically hand out IP configuration, but that would hide part of what I actually wanted to learn.
 
-For now I am configuring the network manually.
+I started the lab with manual addressing and later installed the Windows DHCP Server role on `HOOMA-DC`.
 
-Later I want Windows Server to provide DHCP itself so I can learn how DHCP works in a Windows domain environment without having VirtualBox DHCP and Windows DHCP competing on the same virtual network.
+That means the responsibilities are now split like this:
 
-VirtualBox is basically providing the virtual network and NAT route.
+```text
+VirtualBox
+└── provides the virtual network and NAT gateway
 
-Windows Server will provide the enterprise services I actually want to learn.
+HOOMA-DC
+├── Active Directory
+├── DNS
+└── DHCP
+```
 
 ## Static Network Configuration
 
@@ -335,7 +342,7 @@ The relationship now looks roughly like this:
         +------------+-------------+
                      |
                   CLIENT01
-                10.10.10.20
+                10.10.10.100
 ```
 
 ## DNS and the Domain Controller
@@ -513,7 +520,7 @@ is stored and authenticated by Active Directory.
 
 ## CLIENT01 Networking
 
-I gave the client a static address:
+During the original CLIENT01 build, I deliberately gave the client a static address:
 
 ```text
 IP address:       10.10.10.20
@@ -521,6 +528,10 @@ Subnet mask:      255.255.255.0
 Default gateway:  10.10.10.1
 DNS:              10.10.10.10
 ```
+
+Using a static address at this stage kept the networking predictable while I was joining the machine to the domain and testing Active Directory.
+
+Later in the lab I replaced this manual configuration with Windows DHCP and gave CLIENT01 a DHCP reservation for `10.10.10.100`.
 
 Before joining the domain, I verified that CLIENT01 could actually reach the Domain Controller:
 
@@ -547,6 +558,8 @@ The active Ethernet adapter showed:
 ```text
 10.10.10.10
 ```
+
+At this stage CLIENT01 was still using its original static address of `10.10.10.20`. The later move to DHCP did not change the DNS design: CLIENT01 still uses `10.10.10.10` as its DNS server because domain clients need to query the Active Directory DNS service running on HOOMA-DC.
 
 ## Discovering Active Directory from CLIENT01
 
@@ -795,37 +808,154 @@ Major Crimes users
 
 ---
 
+# Windows DHCP
+
+I originally kept CLIENT01 on a static address because I wanted the basic networking to be completely predictable while I was building the domain.
+
+Once AD, DNS and Group Policy were working, I finally went back to the decision I made at the start of the lab and let Windows Server take over DHCP.
+
+## Installing and Authorizing DHCP
+
+I installed the DHCP Server role on HOOMA-DC and completed the post-install configuration so the server was authorized in Active Directory.
+
+That authorization step matters in a domain environment because a Windows DHCP server should not just appear on the network and start handing out configuration without being trusted by AD.
+
+## ADLAB Client Scope
+
+I created an IPv4 scope called:
+
+ADLAB Client Scope
+
+with this address pool:
+
+```text
+Start:        10.10.10.100
+End:          10.10.10.199
+Subnet mask:  255.255.255.0
+Prefix:       /24
+Lease:        8 days
+```
+
+I did not need exclusions inside the pool because the important infrastructure addresses are already outside it:
+
+```text
+10.10.10.1   VirtualBox gateway
+10.10.10.10  HOOMA-DC
+```
+
+## DHCP Scope Options
+
+The scope options are:
+
+```text
+003 Router           10.10.10.1
+006 DNS Servers      10.10.10.10
+015 DNS Domain Name  hoomaverse.test
+```
+
+The DNS option is especially important. A domain client getting an address from DHCP still needs to use HOOMA-DC for DNS so it can discover the Active Directory services for hoomaverse.test.
+
+## Moving CLIENT01 from Static to DHCP
+
+On CLIENT01 I changed IPv4 from the original manual configuration to:
+
+Obtain an IP address automatically
+Obtain DNS server address automatically
+
+The client then received:
+
+```text
+IPv4 address:    10.10.10.100
+Subnet mask:     255.255.255.0
+Default gateway: 10.10.10.1
+DHCP server:     10.10.10.10
+DNS server:      10.10.10.10
+DNS suffix:      hoomaverse.test
+```
+
+I verified that from CLIENT01 with:
+
+```cmd
+ipconfig /all
+```
+
+and then checked Address Leases on HOOMA-DC, where the same CLIENT01 lease appeared from the server side.
+
+So the DHCP path was working end to end rather than just looking correct in the wizard.
+
+## DORA
+
+This was also a good point to put the classic DHCP DORA process into something real:
+
+```text
+Discover
+   ↓
+Offer
+   ↓
+Request
+   ↓
+Acknowledge
+```
+
+CLIENT01 broadcasts that it needs network configuration, HOOMA-DC offers an available lease, CLIENT01 requests it, and HOOMA-DC acknowledges the lease along with the gateway, DNS and domain options.
+
+## CLIENT01 Reservation
+
+After confirming the normal dynamic lease worked, I added CLIENT01 to Reservations so it keeps 10.10.10.100.
+
+That means the client is still configured for DHCP and still asks the server for its network settings, but the DHCP server recognises CLIENT01 and gives it the same address each time.
+
+That is different from manually typing 10.10.10.100 into Windows.
+
+Static address
+= configured manually on the client
+
+DHCP reservation
+= client uses DHCP, server reserves a specific address for it
+
+HOOMA-DC itself stays statically configured at 10.10.10.10 because the Domain Controller, DNS server and DHCP server should remain reliably reachable.
+
+Selected DHCP evidence is stored under:
+
+```text
+screenshots/dhcp/
+```
+
+---
+
 # What Comes Next
-
-## Finish User-Side Group Policy
-
-The current task is finishing and verifying the Major Crimes user restriction, then checking the applied user policies from CLIENT01.
-
-## DHCP
-
-The lab currently uses manually assigned IP addresses.
-
-Later I plan to install the Windows DHCP Server role and let Windows Server handle client addressing instead of VirtualBox.
-
-That will let me learn:
-
-- scopes
-- leases
-- exclusions
-- reservations
-- DHCP options
-- how DHCP behaves inside a Windows domain
 
 ## Permissions and File Shares
 
-I also want to build shared folders and practice the relationship between:
+The next part of the lab is building shared folders and practising the relationship between:
 
-- users
-- groups
-- share permissions
+- Active Directory users
+- security groups
+- SMB share permissions
 - NTFS permissions
+- effective access
 
-Rather than assigning permissions directly to random users, I want to manage access through the security groups I already created.
+Rather than assigning permissions directly to individual users, I want to use the `GG_CBI_*` security groups I already created.
+
+The plan is to create departmental shares, give the correct security groups access, and then test both sides from CLIENT01:
+
+```text
+Correct group member
+        |
+        v
+Access allowed ✅
+```
+
+and:
+
+```text
+User from another department
+        |
+        v
+Access denied ❌
+```
+
+That should make the security groups I created earlier start doing something much more useful than simply existing in Active Directory.
 
 ## IT Support Scenarios
 
@@ -842,7 +972,7 @@ Once the normal environment is working, I want to deliberately create problems s
 
 A working environment teaches me how to build Active Directory.
 
-A broken one should teach me how to actually support it.
+A broken one would teach me how to actually support it.
 
 ---
 
