@@ -6,8 +6,6 @@ The aim is to understand what is happening underneath each step, especially netw
 
 This repo is a work in progress and will grow alongside the lab.
 
-This repo is a work in progress and will grow alongside the lab.
-
 > I also decided to theme the lab around the TV series *The Mentalist*, which is why the users, departments and a few other names are based around the CBI.
 
 ## What I Want to Learn
