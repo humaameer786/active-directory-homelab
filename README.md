@@ -42,11 +42,11 @@ I’m documenting:
 - users, groups and computer objects
 - Windows client deployment and domain joining
 - Group Policy
-- troubleshooting notes from things that actually break
 - PowerShell and Windows commands used for verification
-- selected screenshots where they actually add something useful
+- selected screenshots where they add something useful
 - Windows DHCP
-- later file shares, permissions and IT support scenarios
+- Windows file sharing and group-based NTFS permissions
+- later IT support scenarios
 - later security-focused AD exercises once the admin side is properly understood
 
 ---
@@ -482,7 +482,9 @@ GG_CBI_Investigations
 
 Users were added to the relevant groups.
 
-Later these groups will become much more useful when I start working with shared folders and permissions, because I want to grant access through groups rather than assigning permissions directly to individual users.
+These groups became especially useful when I moved into file sharing and permissions. Instead of assigning access directly to individual users, I used the security groups to control which departments could access particular resources.
+
+That gave the groups a practical purpose beyond simply organising users inside Active Directory.
 
 ---
 
@@ -923,46 +925,197 @@ screenshots/dhcp/
 
 ---
 
-# What Comes Next
+# File Sharing and Permissions
 
-## Permissions and File Shares
+After setting up users and security groups earlier in the lab, I wanted to use them for something more practical than simply organising Active Directory objects.
 
-The next part of the lab is building shared folders and practising the relationship between:
+I created a departmental SMB share for the CBI Major Crimes team and used the existing `GG_CBI_MajorCrimes` security group to control access.
 
-- Active Directory users
-- security groups
-- SMB share permissions
-- NTFS permissions
-- effective access
+## Creating the Major Crimes Share
 
-Rather than assigning permissions directly to individual users, I want to use the `GG_CBI_*` security groups I already created.
-
-The plan is to create departmental shares, give the correct security groups access, and then test both sides from CLIENT01:
+On `HOOMA-DC`, I created:
 
 ```text
-Correct group member
-        |
-        v
+C:\Shares\CBI-MajorCrimes
+```
+
+and shared it over SMB as:
+
+```text
+\\HOOMA-DC\CBI-MajorCrimes
+```
+
+This introduced another useful distinction:
+
+```text
+Local folder path
+C:\Shares\CBI-MajorCrimes
+
+        vs
+
+Network share path
+\\HOOMA-DC\CBI-MajorCrimes
+```
+
+The first refers to the folder directly on the server.
+
+The second is the UNC path clients use to access the same resource over the network.
+
+## NTFS Permissions
+
+I disabled inherited permissions on the Major Crimes folder so I could control the ACL explicitly.
+
+The final NTFS permissions were:
+
+```text
+SYSTEM                  Full Control
+Administrators          Full Control
+GG_CBI_MajorCrimes      Modify
+```
+
+The `GG_CBI_MajorCrimes` group received **Modify** rather than Full Control.
+
+That allows members to:
+
+```text
+read files
+create files
+edit files
+delete files
+list folder contents
+```
+
+without giving them permission to take ownership of the folder or rewrite its security configuration.
+
+I also removed broad inherited user access so membership of the Major Crimes security group became the deciding factor.
+
+## Share Permissions
+
+At the SMB share layer, I configured:
+
+```text
+Authenticated Users    Change
+Administrators         Full Control
+```
+
+The share permissions are deliberately broader than the NTFS permissions.
+
+This let me see how the two permission layers work together:
+
+```text
+Share permission
+        +
+NTFS permission
+        =
+Effective network access
+```
+
+An authenticated domain user can reach the SMB share layer, but they still need the correct NTFS permissions on the underlying folder.
+
+## Testing Authorized Access
+
+I signed into CLIENT01 as:
+
+```text
+HOOMAVERSE\teresa.lisbon
+```
+
+Teresa is a member of:
+
+```text
+GG_CBI_MajorCrimes
+```
+
+I opened:
+
+```text
+\\HOOMA-DC\CBI-MajorCrimes
+```
+
+and confirmed that Teresa could access the share and create and edit files.
+
+The access path was therefore:
+
+```text
+Teresa Lisbon
+      |
+      v
+Authenticated domain user
+      |
+      v
+Share permission passes
+      |
+      v
+Member of GG_CBI_MajorCrimes
+      |
+      v
+NTFS Modify permission
+      |
+      v
 Access allowed ✅
 ```
 
-and:
+## Testing Unauthorized Access
+
+I then signed into CLIENT01 as Luther Wainwright, a user from the Management department.
+
+Luther is a valid authenticated domain user but is not a member of:
 
 ```text
-User from another department
-        |
-        v
+GG_CBI_MajorCrimes
+```
+
+When I tried to open:
+
+```text
+\\HOOMA-DC\CBI-MajorCrimes
+```
+
+Windows denied access.
+
+That produced the opposite path:
+
+```text
+Luther Wainwright
+      |
+      v
+Authenticated domain user
+      |
+      v
+Share permission passes
+      |
+      v
+Not a member of GG_CBI_MajorCrimes
+      |
+      v
+No matching NTFS permission
+      |
+      v
 Access denied ❌
 ```
 
-That should make the security groups I created earlier start doing something much more useful than simply existing in Active Directory.
+This was useful because it proved the permissions from both directions rather than simply confirming that one authorized account could open the folder.
+
+At this point I had successfully used an Active Directory security group to control access to a Windows file share and verified both authorized and unauthorized access from a domain-joined client.
+
+Selected evidence for this part of the lab is stored under:
+
+```text
+screenshots/file-sharing/
+```
+
+---
+
+# What Comes Next
 
 ## IT Support Scenarios
 
-Once the normal environment is working, I want to deliberately create problems such as:
+Now that the normal environment is working, I want to start deliberately creating problems and troubleshooting them rather than continuing to add more services just for the sake of it.
+
+The next exercises will include scenarios such as:
 
 - locked user accounts
-- forgotten passwords
+- forgotten and expired passwords
 - disabled accounts
 - incorrect DNS settings
 - failed domain logins
@@ -970,9 +1123,11 @@ Once the normal environment is working, I want to deliberately create problems s
 - Group Policy issues
 - domain-join failures
 
-A working environment teaches me how to build Active Directory.
+The goal is to practise identifying which layer is actually failing before changing anything.
 
-A broken one would teach me how to actually support it.
+A working environment has taught me how to build Active Directory.
+
+Breaking parts of it deliberately should teach me how to support it.
 
 ---
 
